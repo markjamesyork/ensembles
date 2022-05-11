@@ -288,20 +288,23 @@ def main(ensemble_fraction_of_train = .2,n_models = 10, n_deploy = 100, \
                 beta_norm_shift, covariance_shift_stdev, n, eps_sigma, optimal_alpha] #second list passes settings
 
 
-def simulation_loop():
+def simulation_loop(multiprocessing=False, ensemble_fraction_of_train_vec=None, \
+            n_models_vec=None, n_deploy_vec=None, dim_x_vec=None, \
+            beta_norm_shift_vec=None, covariance_shift_stdev_vec=None):
     '''
     This function varies a parameter of interest, calls main, and stores results
     in a .csv file
     '''
     #0 Set parameter values to loop through
-    vector_len = 9
-    ensemble_fraction_of_train_vec = [.1, .2, .3, .4, .5, .6, .7, .8, .9] #  [.1]*vector_len # [.01, .025, .05, .075, .1, .15, .2]#
-    n_models_vec = [20]*vector_len #[2, 4, 6, 8, 10, 15, 20]
-    n_deploy_vec = [100]*vector_len #[5, 25, 125, 625]#[50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000] #[1000]*vector_len #
-    dim_x_vec = [10]*vector_len #[2,4,6,8,10,12,14,16,18,20] #
-    beta_norm_shift_vec = [0]*vector_len#[0, .05, .1, .15, .2, .25, .3]#
-    covariance_shift_stdev_vec = [0]*vector_len #[1.]*vector_len #[.2, .4, .6, .8, 1, 2]
     n_reps = 50
+    if multiprocessing == False: #set parameter values here rather than having them passed into simulation_loop()
+        vector_len = 9
+        ensemble_fraction_of_train_vec = [.1, .2, .3, .4, .5, .6, .7, .8, .9] #  [.1]*vector_len # [.01, .025, .05, .075, .1, .15, .2]#
+        n_models_vec = [20]*vector_len #[2, 4, 6, 8, 10, 15, 20]
+        n_deploy_vec = [100]*vector_len #[5, 25, 125, 625]#[50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000] #[1000]*vector_len #
+        dim_x_vec = [10]*vector_len #[2,4,6,8,10,12,14,16,18,20] #
+        beta_norm_shift_vec = [0]*vector_len#[0, .05, .1, .15, .2, .25, .3]#
+        covariance_shift_stdev_vec = [0]*vector_len #[1.]*vector_len #[.2, .4, .6, .8, 1, 2]
 
     #1 Run main for each set of parameters and write to .csv file
     for j in range(len(n_deploy_vec)):
@@ -328,9 +331,42 @@ def simulation_loop():
 
         with open('ensemble_scoring_simulations.csv','a') as fd:
             fd.write(row)
+        if multiprocessing == True: print('One configuration just printed!')
     return
 
 simulation_loop()
+
+def run_simulation_loop_parallel():
+    '''This function runs the simulation_loop function on various settings in parallel.
+    Each processor runs simulation_loop with a different set of parameters and writes
+    the results to ensemble_scoring_simulations.csv
+    #Note that inputs must be a list of tuples
+    '''
+    #0 Lists of configurations
+    vector_len = 7
+    ensemble_fraction_of_train_vec = [.1]*vector_len*2 #[.1, .2, .3, .4, .5, .6, .7, .8, .9] #   [.01, .025, .05, .075, .1, .15, .2]#
+    n_models_vec = [20]*vector_len*2 #[2, 4, 6, 8, 10, 15, 20, 50, 100] #
+    n_deploy_vec = [100]*vector_len*2 #[10, 25, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]*2 #[5, 25, 125, 625]#[1000]*vector_len #
+    dim_x_vec = [20]*vector_len*2 #[2,4,6,8,10,12,14,16,18,20] #
+    beta_norm_shift_vec = [0, .05, .1, .15, .2, .25, .3] + [.1]*vector_len #[0]*vector_len  #
+    covariance_shift_stdev_vec = [.4]*vector_len + [0, .2, .4, .6, .8, 1, 2] #[0]*vector_len + [.4]*vector_len +  #[1.]*vector_len #
+
+    #1 Make inputs list of tuples
+    inputs = []
+    for i in range(len(ensemble_fraction_of_train_vec)):
+        inputs += [(True, [ensemble_fraction_of_train_vec[i]], [n_models_vec[i]],\
+                    [n_deploy_vec[i]], [dim_x_vec[i]], [beta_norm_shift_vec[i]],\
+                    [covariance_shift_stdev_vec[i]],)]
+
+    #2 Run simulation loop in parallel
+    p = mp.Pool(4) #number of cores on my MacBook Air
+    p.starmap(simulation_loop, inputs)
+
+    return
+
+run_simulation_loop_parallel()
+
+
 '''
 dim_x = 10
 A = np.random.rand(dim_x, dim_x)
